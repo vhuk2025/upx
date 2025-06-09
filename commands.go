@@ -638,3 +638,23 @@ func NewMoveCommand() cli.Command {
 		},
 	}
 }
+
+func NewPutByMapCommand() cli.Command {
+	return cli.Command{
+		Name:      "put-by-map",
+		Usage:     "put files inside cloud storage by map",
+		ArgsUsage: "[map-file]",
+		Before:    CreateInitCheckFunc(LOGIN, CHECK),
+		Action: func(c *cli.Context) error {
+			if c.NArg() != 1 {
+				PrintErrorAndExit("invalid command args")
+			}
+			session.PutByMap(c.Args()[0], c.Int("w"), c.Int("mode"))
+			return nil
+		},
+		Flags: []cli.Flag{
+			cli.IntFlag{Name: "w", Usage: "max concurrent threads", Value: 5},
+			cli.IntFlag{Name: "mode", Usage: "upload mode: 1=overwrite, 2=skip if exists, 3=overwrite if remote is smaller (default)", Value: 3},
+		},
+	}
+}

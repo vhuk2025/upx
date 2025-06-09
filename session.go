@@ -1,12 +1,12 @@
 package upx
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
@@ -1221,7 +1221,7 @@ func (sess *Session) PostTask(app, notify, taskFile string) {
 		PrintErrorAndExit("open %s: %v", taskFile, err)
 	}
 
-	body, err := ioutil.ReadAll(fd)
+	body, err := io.ReadAll(fd)
 	fd.Close()
 	if err != nil {
 		PrintErrorAndExit("read %s: %v", taskFile, err)
@@ -1255,7 +1255,7 @@ func (sess *Session) Purge(urls []string, file string) {
 		if err != nil {
 			PrintErrorAndExit("open %s: %v", file, err)
 		}
-		body, err := ioutil.ReadAll(fd)
+		body, err := io.ReadAll(fd)
 		fd.Close()
 		if err != nil {
 			PrintErrorAndExit("read %s: %v", file, err)
@@ -1421,4 +1421,53 @@ func (sess *Session) putFileWithProgressAndMode(localPath, upPath string, localI
 
 	// 执行上传
 	return sess.putFileWithProgress(localPath, upPath, localInfo)
+}
+
+func (sess *Session) PutByMap(mapFile string, workers int, mode int) {
+	fd, err := os.Open(mapFile)
+	if err != nil {
+		PrintErrorAndExit("open %s: %v", mapFile, err)
+	}
+	defer fd.Close()
+
+	scanner := bufio.NewScanner(fd)
+	var (
+		uploadedFile []*UploadedFile
+	)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+
+		localPath := fields[0]
+		upPath := fields[1]
+
+		localInfo, err := os.Stat(localPath)
+		if err != nil {
+			PrintErrorAndExit(err.Error())
+		}
+
+		uploadedFile = append(uploadedFile, &UploadedFile{
+			barId:     -1,
+			LocalPath: localPath,
+			UpPath:    upPath,
+			LocalInfo: localInfo,
+			Mode:      mode,
+		})
+
+	}
+
+	if err := scanner.Err(); err != nil {
+		PrintErrorAndExit("read %s: %v", mapFile, err)
+	}
+
+	// 上传文件
+	sess.putFilesWitchProgress(uploadedFile, workers)
 }
